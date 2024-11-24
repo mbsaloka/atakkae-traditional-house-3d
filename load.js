@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-const renderer = new THREE.WebGLRenderer({ antialias: false });
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -21,7 +21,8 @@ camera.position.set(4, 5, 11);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.enablePan = false;
+controls.enablePan = true;
+controls.keyPanSpeed = 50;
 controls.minDistance = 5;
 controls.maxDistance = 50;
 controls.minPolarAngle = 0.5;
@@ -37,6 +38,12 @@ const groundMaterial = new THREE.MeshStandardMaterial({
   side: THREE.DoubleSide
 });
 
+// scene.background = new THREE.Color(0xFFFFFF);
+const loaderBackground = new THREE.TextureLoader();
+loaderBackground.load('textures/morning.jpg', (background) => {
+  scene.background = background;
+});
+
 // const spotLight = new THREE.SpotLight(0x7F7FFF, 100, 100, 0.30, 1);
 // spotLight.position.set(10, 60, 5);
 // spotLight.castShadow = true;
@@ -50,7 +57,7 @@ const groundMaterial = new THREE.MeshStandardMaterial({
 // scene.add(spotLight1);
 
 // Menambahkan DirectionalLight (cahaya matahari)
-const sunLight = new THREE.DirectionalLight(0xffffff, 1); // Warna putih, intensitas 1
+const sunLight = new THREE.DirectionalLight(0xFFFFFF, 1); // Warna putih, intensitas 1
 sunLight.position.set(10, 20, 10); // Posisi cahaya
 sunLight.castShadow = true; // Jika menggunakan shadow
 
@@ -59,8 +66,6 @@ sunLight.shadow.mapSize.width = 1024;
 sunLight.shadow.mapSize.height = 1024;
 sunLight.shadow.camera.near = 0.5;
 sunLight.shadow.camera.far = 50;
-// sunLight.shadow.mapSize.width = 512;
-// sunLight.shadow.mapSize.height = 512;
 
 scene.add(sunLight);
 
@@ -100,3 +105,64 @@ function animate() {
 }
 
 animate();
+
+// Predefined Camera Movements
+function orbitCamera(target, duration = 3) {
+  const angle = { theta: 0 };
+  gsap.to(angle, {
+    theta: Math.PI * 2,
+    duration: duration,
+    ease: 'power1.inOut',
+    onUpdate: () => {
+      const radius = 10;
+      camera.position.x = target.x + radius * Math.cos(angle.theta);
+      camera.position.z = target.z + radius * Math.sin(angle.theta);
+      camera.lookAt(target);
+    }
+  });
+}
+
+function zoomCamera(distance, duration = 2) {
+  gsap.to(camera.position, {
+    z: distance,
+    duration: duration,
+    ease: 'power1.inOut'
+  });
+}
+
+function moveCamera(position, target, duration = 2) {
+  gsap.to(camera.position, {
+    x: position.x,
+    y: position.y,
+    z: position.z,
+    duration: duration,
+    ease: 'power1.inOut',
+    onUpdate: () => {
+      camera.lookAt(target);
+    }
+  });
+}
+
+// Add Buttons for Camera Movements
+const buttonContainer = document.createElement('div');
+buttonContainer.style.position = 'fixed';
+buttonContainer.style.top = '10px';
+buttonContainer.style.left = '10px';
+buttonContainer.style.zIndex = '1000';
+
+const orbitButton = document.createElement('button');
+orbitButton.textContent = 'Orbit';
+orbitButton.onclick = () => orbitCamera(new THREE.Vector3(0, 1, 0));
+buttonContainer.appendChild(orbitButton);
+
+const zoomButton = document.createElement('button');
+zoomButton.textContent = 'Zoom In';
+zoomButton.onclick = () => zoomCamera(5);
+buttonContainer.appendChild(zoomButton);
+
+const moveButton = document.createElement('button');
+moveButton.textContent = 'Move';
+moveButton.onclick = () => moveCamera({ x: 0, y: 5, z: 10 }, new THREE.Vector3(0, 1, 0));
+buttonContainer.appendChild(moveButton);
+
+document.body.appendChild(buttonContainer);

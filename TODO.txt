@@ -1,0 +1,19 @@
+Description Task:
+Membuat web rumah adat bugis interaktif menggunakan webGL dan Three.js
+
+TODO Features:
+1. Pre-defined camera movement:
+  a. Orbit in extreme wide shot (show full house and environment)
+  b. Truck/Crab along side the house (all 4 side)
+  c. Dolly in wide shot
+
+2. Simulate morning/day/night (change DirectionalLight and AmbientLight)
+
+3. Add more interior and environment model
+  a. make/search new interior/environment model
+  b. place interior/environment to final model
+  c. add "infinite" ground and 360 background (for morning, day, and night)
+
+4. Show case interior:
+  a. predefined camera movement for some room
+  b. Dolly in (like walking inside the room)
