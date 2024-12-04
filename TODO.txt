@@ -1,19 +1,19 @@
-Description Task:
-Membuat web rumah adat bugis interaktif menggunakan webGL dan Three.js
+Deskripsi Tugas:
+Membuat website interaktif rumah adat Bugis menggunakan Three.js.
 
 TODO Features:
-1. Pre-defined camera movement:
-  a. Orbit in extreme wide shot (show full house and environment)
-  b. Truck/Crab along side the house (all 4 side)
-  c. Dolly in wide shot
+1. Gerakan Kamera yang Telah Ditentukan:
+    a. Orbit dengan tampilan extreme wide shot (menampilkan rumah dan lingkungan).
+    b. Truck/Crab di sepanjang sisi rumah (keempat sisi).
+    c. Dolly dengan tampilan wide shot.
 
-2. Simulate morning/day/night (change DirectionalLight and AmbientLight)
+2. Simulasi Pagi/Siang/Malam:
+    a. Mengubah DirectionalLight dan AmbientLight untuk menyesuaikan waktu.
 
-3. Add more interior and environment model
-  a. make/search new interior/environment model
-  b. place interior/environment to final model
-  c. add "infinite" ground and 360 background (for morning, day, and night)
+3. Penambahan Model Interior dan Lingkungan:
+    a. Menambahkan ground dan background untuk pagi, siang, dan malam.
+    b. Bikin atau cari model tambahan untuk interior/lingkungan.
 
-4. Show case interior:
-  a. predefined camera movement for some room
-  b. Dolly in (like walking inside the room)
+4. Showcase Interior:
+    a. Camera movement di beberapa ruangan.
+    b. Dolly in (seperti berjalan ke dalam ruangan).
