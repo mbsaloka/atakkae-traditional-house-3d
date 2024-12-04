@@ -170,54 +170,70 @@ window.addEventListener('resize', () => {
 });
 
 // Predefined camera movements
+let orbiting = true; // Flag untuk mengontrol orbit kamera
+let orbitAnimation;
+
 function orbitCamera(target, height, radius, duration = 15, direction = 1) {
   return new Promise((resolve) => {
     const angle = { theta: 0 };
-    gsap.to(angle, {
-      theta: Math.PI * 2 * direction,
-      duration: duration,
-      ease: 'linear',
-      onUpdate: () => {
-        camera.position.x = target.x + radius * Math.cos(angle.theta);
-        camera.position.y = target.y + height;
-        camera.position.z = target.z + radius * Math.sin(angle.theta);
-        camera.lookAt(target);
-        if (direction === 1) {
-          if (angle.theta >= Math.PI * 2 * 0.9) {
-            fadeTransition(0.5).then(resolve);
+
+    function startOrbit() {
+      if (!orbiting) return resolve(); // Stop orbit jika orbiting false
+
+      orbitAnimation = gsap.to(angle, {
+        theta: Math.PI * 2 * direction,
+        duration: duration,
+        ease: 'linear',
+        onUpdate: () => {
+          camera.position.x = target.x + radius * Math.cos(angle.theta);
+          camera.position.y = target.y + height;
+          camera.position.z = target.z + radius * Math.sin(angle.theta);
+          camera.lookAt(target);
+        },
+        onComplete: () => {
+          if (orbiting) {
+            angle.theta = 0; // Reset sudut untuk pengulangan
+            startOrbit(); // Orbit ulang jika orbiting masih true
           }
-        } else if (direction === -1) {
-          if (angle.theta <= Math.PI * 2 * 0.9 * -1) {
-            fadeTransition(0.5).then(resolve);
-          }
-        }
-        console.log(angle.theta);
-      },
-    });
+        },
+      });
+    }
+
+    startOrbit();
   });
 }
 
-function fadeTransition(duration = 1) {
+function fadeTransition(duration = 1, fadeIn = true) {
   const overlay = document.getElementById('overlay');
   overlay.style.transition = `opacity ${duration}s`;
-  overlay.style.opacity = 1;
+  overlay.style.opacity = fadeIn ? 1 : 0;
 
   return new Promise((resolve) => {
-    setTimeout(() => {
-      overlay.style.opacity = 0;
-      resolve();
-    }, duration * 1000);
+    setTimeout(() => resolve(), duration * 1000);
   });
 }
 
-// Gabungkan beberapa gerakan kamera
-function combinedCameraMovement() {
-  orbitCamera(new THREE.Vector3(0, 1, -20), 20, 60, 30).then(() => {
-    // fadeTransition(0.1);
+// Fungsi untuk mengganti animasi dengan fade effect
+async function changeAnimation(newAnimation) {
+  orbiting = false; // Hentikan orbit saat mengganti animasi
+  await fadeTransition(1, true); // Fade in
+	if (orbitAnimation) orbitAnimation.kill(); // Hentikan animasi GSAP secara langsung
 
-    return orbitCamera(new THREE.Vector3(0, 1, -10), 10, 30, 20, -1); // Orbit lebih dekat dengan rotasi berlawanan
-  });
+  orbiting = true; // Izinkan orbit kembali
+  newAnimation(); // Jalankan animasi baru
+
+  await fadeTransition(1, false); // Fade out
 }
+
+// Event listener untuk kontrol manual
+window.addEventListener('mousedown', (event) => {
+  // Periksa apakah elemen yang diklik adalah tombol
+  if (event.target.tagName === 'BUTTON') return;
+
+  orbiting = false; // Hentikan flag orbiting
+  if (orbitAnimation) orbitAnimation.kill(); // Hentikan animasi GSAP secara langsung
+});
+
 
 // Add buttons for new camera movements
 const buttonContainer = document.createElement('div');
@@ -227,10 +243,15 @@ buttonContainer.style.left = '10px';
 buttonContainer.style.zIndex = '1000';
 
 // Tambahkan tombol untuk gerakan kombinasi
-const combinedButton = document.createElement('button');
-combinedButton.textContent = 'Combined Movement';
-combinedButton.onclick = combinedCameraMovement;
-buttonContainer.appendChild(combinedButton);
+const AnimationOrbit1 = document.createElement('button');
+AnimationOrbit1.textContent = 'Animation Orbit 1';
+AnimationOrbit1.onclick = () => changeAnimation(() => orbitCamera(new THREE.Vector3(0, 1, 0), 20, 60, 30));
+buttonContainer.appendChild(AnimationOrbit1);
+
+const AnimationOrbit2 = document.createElement('button');
+AnimationOrbit2.textContent = 'Animation Orbit 2';
+AnimationOrbit2.onclick = () => changeAnimation(() => orbitCamera(new THREE.Vector3(0, 1, 20), 10, 45, 25, -1));
+buttonContainer.appendChild(AnimationOrbit2);
 
 // Tambahkan overlay untuk efek fade
 const overlay = document.createElement('div');
