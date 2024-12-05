@@ -14,49 +14,123 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 
-// Create a simple gradient background
 const vertexShader = `
 varying vec3 vWorldPosition;
 void main() {
-	vWorldPosition = position;
-	gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vWorldPosition = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
 
-const fragmentShader = `
-varying vec3 vWorldPosition;
-void main() {
-	float y = normalize(vWorldPosition).y;
+const ambienceSettings = {
+    morning: {
+        sky: {
+            skyColor: 'vec3(0.85, 0.85, 0.9)',
+            horizonColor: 'vec3(1.0, 0.8, 0.4)',
+            groundColor: 'vec3(0.9, 0.8, 0.4)'
+        },
+        lighting: {
+            ambientColor: 0xAAD3FF,
+            ambientIntensity: 0.4,
+            sunColor: 0xFFB24C,
+            sunIntensity: 4.0,
+            sunPosition: new THREE.Vector3(100, 20, 20)
+        },
+        fog: {
+            color: 0xffcc66,
+            near: 150,
+            far: 200
+        }
+    },
+    midday: {
+        sky: {
+            skyColor: 'vec3(0.75, 0.85, 0.9)',
+            horizonColor: 'vec3(0.9, 0.9, 0.9)',
+            groundColor: 'vec3(0.9, 0.9, 0.9)'
+        },
+        lighting: {
+            ambientColor: 0xffffff,
+            ambientIntensity: 0.4,
+            sunColor: 0xFFFFFA,
+            sunIntensity: 4.0,
+            sunPosition: new THREE.Vector3(20, 100, 20)
+        },
+        fog: {
+            color: 0xe5e5e5,
+            near: 150,
+            far: 200
+        }
+    },
+    afternoon: {
+        sky: {
+            skyColor: 'vec3(0.85, 0.75, 0.8)',
+            horizonColor: 'vec3(0.8, 0.6, 0.4)',
+            groundColor: 'vec3(0.9, 0.8, 0.4)'
+        },
+        lighting: {
+            ambientColor: 0xAAD3FF,
+            ambientIntensity: 0.3,
+            sunColor: 0xFFB24C,
+            sunIntensity: 2.0,
+            sunPosition: new THREE.Vector3(-200, 20, 20)
+        },
+        fog: {
+            color: 0xcc9966,
+            near: 150,
+            far: 200
+        }
+    },
+    night: {
+        sky: {
+            skyColor: 'vec3(0.08, 0.08, 0.25)',
+            horizonColor: 'vec3(0.1, 0.1, 0.1)',
+            groundColor: 'vec3(0.08, 0.1, 0.08)'
+        },
+        lighting: {
+            ambientColor: 0xffffff,
+            ambientIntensity: 0.2,
+            sunColor: 0xCCCCFF,
+            sunIntensity: 0.3,
+            sunPosition: new THREE.Vector3(20, 100, 20)
+        },
+        fog: {
+            color: 0x191919,
+            near: 100,
+            far: 200
+        }
+    }
+};
 
-	// Create sharper transition at horizon
-	vec3 skyColor = vec3(0.75, 0.85, 0.9);    // Light blue-gray for sky
-	vec3 horizonColor = vec3(0.9, 0.9, 0.9);  // Almost white for horizon
-	vec3 groundColor = vec3(0.9, 0.9, 0.9);  // Similar to sky for smooth bottom
+function createSkyMaterial(timeOfDay) {
+    const settings = ambienceSettings[timeOfDay].sky;
+    const fragmentShader = `
+    varying vec3 vWorldPosition;
+    void main() {
+        float y = normalize(vWorldPosition).y;
+        vec3 skyColor = ${settings.skyColor};
+        vec3 horizonColor = ${settings.horizonColor};
+        vec3 groundColor = ${settings.groundColor};
+        float horizonSharpness = 8.0;
+        float t = pow(1.0 - abs(y), horizonSharpness);
+        vec3 finalColor;
+        if (y > 0.0) {
+            finalColor = mix(skyColor, horizonColor, t);
+        } else {
+            finalColor = mix(groundColor, horizonColor, t);
+        }
+        gl_FragColor = vec4(finalColor, 1.0);
+    }`;
 
-	// Create sharper transition near horizon (y = 0)
-	float horizonSharpness = 8.0;  // Increase for sharper horizon line
-	float t = pow(1.0 - abs(y), horizonSharpness);
+    return new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false
+    });
+}
 
-	// Mix colors based on height and horizon transition
-	vec3 finalColor;
-	if (y > 0.0) {
-		finalColor = mix(skyColor, horizonColor, t);
-	} else {
-		finalColor = mix(groundColor, horizonColor, t);
-	}
-
-	gl_FragColor = vec4(finalColor, 1.0);
-}`;
-
-// Create sky sphere with proper size and position
-const skyGeo = new THREE.SphereGeometry(1000, 32, 32);
-const skyMat = new THREE.ShaderMaterial({
-	vertexShader: vertexShader,
-	fragmentShader: fragmentShader,
-	side: THREE.BackSide,
-	depthWrite: false,
-	fog: false
-});
-
+const skyGeo = new THREE.SphereGeometry(300, 32, 32);
+let skyMat = createSkyMaterial('morning');
 const sky = new THREE.Mesh(skyGeo, skyMat);
 scene.add(sky);
 
@@ -75,67 +149,64 @@ controls.autoRotate = false;
 controls.target = new THREE.Vector3(-20, 1, 30);
 controls.update();
 
-// Ground
-const groundGeometry = new THREE.PlaneGeometry(1000, 1000, 32, 32); // Increased size
+const groundGeometry = new THREE.PlaneGeometry(250, 250, 32, 32);
 groundGeometry.rotateX(-Math.PI / 2);
 const groundMaterial = new THREE.MeshStandardMaterial({
-	color: 0x364531,
-	side: THREE.DoubleSide,
-	roughness: 0.8,
-	metalness: 0.2
+    color: 0x364531,
+    side: THREE.DoubleSide,
+    roughness: 0.8,
+    metalness: 0.2
 });
-
-const textureLoader = new THREE.TextureLoader();
-const groundTexture = textureLoader.load('textures/ground.jpeg');
-groundTexture.wrapS = THREE.RepeatWrapping;
-groundTexture.wrapT = THREE.RepeatWrapping;
-groundTexture.repeat.set(100, 100);
 
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.receiveShadow = true;
-scene.add(ground);
+// scene.add(ground);
 
-scene.fog = new THREE.Fog(0xe5e5e5, 200, 300);
-
-// Basic ambient light for overall scene illumination
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // Reduced intensity for more contrast
+const ambientLight = new THREE.AmbientLight(0xAAD3FF, 0.5);
 scene.add(ambientLight);
 
-// Directional light (sun)
-const sunLight = new THREE.DirectionalLight(0xFFFFFA, 4);
-sunLight.position.set(20, 100, 20);
+const sunLight = new THREE.DirectionalLight(0xFFB24C, 4);
+sunLight.position.copy(ambienceSettings.morning.lighting.sunPosition);
 sunLight.castShadow = true;
 
-// Improve shadow quality and range
 sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
 sunLight.shadow.camera.near = 1;
 sunLight.shadow.camera.far = 500;
-
-// Expand shadow camera frustum to cover more of the scene
-sunLight.shadow.camera.left = -50;
-sunLight.shadow.camera.right = 50;
-sunLight.shadow.camera.top = 50;
-sunLight.shadow.camera.bottom = -50;
-
-// Improve shadow quality
-sunLight.shadow.bias = -0.0000001;
+sunLight.shadow.camera.left = -200;
+sunLight.shadow.camera.right = 200;
+sunLight.shadow.camera.top = 200;
+sunLight.shadow.camera.bottom = -200;
+sunLight.shadow.bias = -0.000001;
 sunLight.shadow.normalBias = 0.02;
 sunLight.shadow.radius = 3;
 
 scene.add(sunLight);
 
-// Optional: Add a helper to visualize the shadow camera (comment out in production)
-const helper = new THREE.CameraHelper(sunLight.shadow.camera);
-scene.add(helper);
+scene.fog = new THREE.Fog(0xffcc66, 150, 200);
 
-// // Add some fill light from the opposite direction
-// const fillLight = new THREE.DirectionalLight(0x8088ff, 0.3); // Slight blue tint
-// fillLight.position.set(-20, 20, -20);
-// scene.add(fillLight);
+function updateAmbience(timeOfDay) {
+    const settings = ambienceSettings[timeOfDay];
 
-// const helper1 = new THREE.CameraHelper(fillLight.shadow.camera);
-// scene.add(helper1);
+    // Update sky
+    sky.material = createSkyMaterial(timeOfDay);
+
+    // Update lights
+    ambientLight.color.setHex(settings.lighting.ambientColor);
+    ambientLight.intensity = settings.lighting.ambientIntensity;
+    sunLight.color.setHex(settings.lighting.sunColor);
+    sunLight.intensity = settings.lighting.sunIntensity;
+    sunLight.position.copy(settings.lighting.sunPosition);
+
+    // Update fog
+    scene.fog.color.setHex(settings.fog.color);
+    scene.fog.near = settings.fog.near;
+    scene.fog.far = settings.fog.far;
+}
+
+document.getElementById('ambience-select').addEventListener('change', (e) => {
+    updateAmbience(e.target.value);
+});
 
 // Model loading
 const loader = new GLTFLoader().setPath('models/');
@@ -322,7 +393,7 @@ function animate() {
 	requestAnimationFrame(animate);
 	controls.update();
 	renderer.render(scene, camera);
-	console.log(camera.position);
+	console.log(animationRunning);
 }
 
 animate();
