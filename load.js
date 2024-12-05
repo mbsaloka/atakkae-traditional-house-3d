@@ -2,134 +2,271 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-// Setup renderer
+// Renderer setup
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x000000);
 renderer.setPixelRatio(window.devicePixelRatio * 0.5);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
 document.body.appendChild(renderer.domElement);
 
-// Setup scene
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 200);
-camera.position.set(20, 8, -15);
+
+// Create a simple gradient background
+const vertexShader = `
+varying vec3 vWorldPosition;
+void main() {
+	vWorldPosition = position;
+	gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const fragmentShader = `
+varying vec3 vWorldPosition;
+void main() {
+	float y = normalize(vWorldPosition).y;
+
+	// Create sharper transition at horizon
+	vec3 skyColor = vec3(0.75, 0.85, 0.9);    // Light blue-gray for sky
+	vec3 horizonColor = vec3(0.9, 0.9, 0.9);  // Almost white for horizon
+	vec3 groundColor = vec3(0.9, 0.9, 0.9);  // Similar to sky for smooth bottom
+
+	// Create sharper transition near horizon (y = 0)
+	float horizonSharpness = 8.0;  // Increase for sharper horizon line
+	float t = pow(1.0 - abs(y), horizonSharpness);
+
+	// Mix colors based on height and horizon transition
+	vec3 finalColor;
+	if (y > 0.0) {
+		finalColor = mix(skyColor, horizonColor, t);
+	} else {
+		finalColor = mix(groundColor, horizonColor, t);
+	}
+
+	gl_FragColor = vec4(finalColor, 1.0);
+}`;
+
+// Create sky sphere with proper size and position
+const skyGeo = new THREE.SphereGeometry(1000, 32, 32);
+const skyMat = new THREE.ShaderMaterial({
+	vertexShader: vertexShader,
+	fragmentShader: fragmentShader,
+	side: THREE.BackSide,
+	depthWrite: false,
+	fog: false
+});
+
+const sky = new THREE.Mesh(skyGeo, skyMat);
+scene.add(sky);
+
+// Camera setup
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1500);
+camera.position.set(20, 5, -5);
+
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.enablePan = true;
-controls.keyPanSpeed = 50;
 controls.minDistance = 5;
-controls.maxDistance = 50;
+controls.maxDistance = 100;
 controls.minPolarAngle = 0.5;
 controls.maxPolarAngle = 1.5;
 controls.autoRotate = false;
-controls.target = new THREE.Vector3(0, 1, 0);
+controls.target = new THREE.Vector3(-20, 1, 30);
 controls.update();
 
-const groundGeometry = new THREE.PlaneGeometry(20, 20, 32, 32);
+// Ground
+const groundGeometry = new THREE.PlaneGeometry(1000, 1000, 32, 32); // Increased size
 groundGeometry.rotateX(-Math.PI / 2);
 const groundMaterial = new THREE.MeshStandardMaterial({
-  color: 0x555555,
-  side: THREE.DoubleSide
+	color: 0x364531,
+	side: THREE.DoubleSide,
+	roughness: 0.8,
+	metalness: 0.2
 });
 
-scene.background = new THREE.Color(0xFFFFFF);
-const loaderBackground = new THREE.TextureLoader();
-loaderBackground.load('textures/morning.jpg', (background) => {
-  scene.background = background;
-});
+const textureLoader = new THREE.TextureLoader();
+const groundTexture = textureLoader.load('textures/ground.jpeg');
+groundTexture.wrapS = THREE.RepeatWrapping;
+groundTexture.wrapT = THREE.RepeatWrapping;
+groundTexture.repeat.set(100, 100);
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+ground.receiveShadow = true;
+scene.add(ground);
+
+scene.fog = new THREE.Fog(0xe5e5e5, 200, 300);
+
+// Basic ambient light for overall scene illumination
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // Reduced intensity for more contrast
 scene.add(ambientLight);
 
-// Load 3D model
+// Directional light (sun)
+const sunLight = new THREE.DirectionalLight(0xFFFFFA, 4);
+sunLight.position.set(20, 100, 20);
+sunLight.castShadow = true;
+
+// Improve shadow quality and range
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 500;
+
+// Expand shadow camera frustum to cover more of the scene
+sunLight.shadow.camera.left = -50;
+sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50;
+sunLight.shadow.camera.bottom = -50;
+
+// Improve shadow quality
+sunLight.shadow.bias = -0.0000001;
+sunLight.shadow.normalBias = 0.02;
+sunLight.shadow.radius = 3;
+
+scene.add(sunLight);
+
+// Optional: Add a helper to visualize the shadow camera (comment out in production)
+const helper = new THREE.CameraHelper(sunLight.shadow.camera);
+scene.add(helper);
+
+// // Add some fill light from the opposite direction
+// const fillLight = new THREE.DirectionalLight(0x8088ff, 0.3); // Slight blue tint
+// fillLight.position.set(-20, 20, -20);
+// scene.add(fillLight);
+
+// const helper1 = new THREE.CameraHelper(fillLight.shadow.camera);
+// scene.add(helper1);
+
+// Model loading
 const loader = new GLTFLoader().setPath('models/');
-loader.load('bugis-v2.glb', (gltf) => {
-  const mesh = gltf.scene;
-  mesh.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
-  });
-  mesh.position.set(0, 1.05, -1);
-  scene.add(mesh);
+loader.load('bugis-v3.glb', (gltf) => {
+	const mesh = gltf.scene;
 
-  document.getElementById('progress-container').style.display = 'none';
-}, ( xhr ) => {
-  document.getElementById('progress').innerHTML = `LOADING ${Math.max(xhr.loaded / xhr.total, 1) * 100}/100`;
-},);
+	mesh.traverse((child) => {
+		if (child.isMesh) {
+			child.castShadow = true;
+			child.receiveShadow = true;
 
-// Handle window resize
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+			if (child.material instanceof THREE.MeshStandardMaterial) {
+			  child.material.roughness = 0.7;
+			  child.material.metalness = 0.2;
+			}
+		}
+	});
+
+	mesh.position.set(-10, 0.7, 30);
+	scene.add(mesh);
+
+	document.getElementById('progress-container').style.display = 'none';
+}, (xhr) => {
+	document.getElementById('progress').innerHTML = `LOADING ${Math.max(xhr.loaded / xhr.total, 1) * 100}/100`;
 });
 
-// Animation loop
-function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
-}
-animate();
+// Window resize handler
+window.addEventListener('resize', () => {
+	camera.aspect = window.innerWidth / window.innerHeight;
+	camera.updateProjectionMatrix();
+	renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
 // Predefined camera movements
+let animationRunning = true; // Flag untuk mengontrol animasi kamera
+let cameraAnimation;
+
 function orbitCamera(target, height, radius, duration = 15, direction = 1) {
   return new Promise((resolve) => {
     const angle = { theta: 0 };
-    gsap.to(angle, {
-      theta: Math.PI * 2 * direction,
-      duration: duration,
-      ease: 'linear',
-      onUpdate: () => {
-        camera.position.x = target.x + radius * Math.cos(angle.theta);
-        camera.position.y = target.y + height;
-        camera.position.z = target.z + radius * Math.sin(angle.theta);
-        camera.lookAt(target);
-        if (direction === 1) {
-          if (angle.theta >= Math.PI * 2 * 0.9) {
-            fadeTransition(0.5).then(resolve);
-          }
-        } else if (direction === -1) {
-          if (angle.theta <= Math.PI * 2 * 0.9 * -1) {
-            fadeTransition(0.5).then(resolve);
-          }
-        }
-        console.log(angle.theta);
-      },
-    });
+
+    function startOrbit() {
+      if (!animationRunning) return resolve(); // Stop orbit jika animationRunning false}
+
+      cameraAnimation = gsap.to(angle, {
+        theta: Math.PI * 2 * direction,
+        duration: duration,
+        ease: 'linear',
+        onUpdate: () => {
+          camera.position.x = target.x + radius * Math.cos(angle.theta);
+          camera.position.y = target.y + height;
+          camera.position.z = target.z + radius * Math.sin(angle.theta);
+          camera.lookAt(target);
+        },
+        onComplete: () => {
+          if (animationRunning) {
+            angle.theta = 0; // Reset sudut untuk pengulangan
+            startOrbit(); // Orbit ulang jika animationRunning masih true
+          } else {
+						orbitAnimation = null; // Hapus referensi jika animasi berhenti
+					}
+        },
+      });
+    }
+
+    startOrbit();
   });
 }
 
-function truckCamera(start, end, duration) {
-  gsap.to(camera.position, {
-    x: end.x,
-    z: end.z,
-    duration: duration,
-    ease: 'power1.inOut',
-    onUpdate: () => {
-      camera.lookAt(new THREE.Vector3(0, 1, 0));
-    }
+function moveWithTargetCamera(target, start, end, duration = 15) {
+	return new Promise((resolve) => {
+		function startMoveWithTarget() {
+			if (!animationRunning) return resolve();
+
+			cameraAnimation = gsap.to(start, {
+				x: end.x,
+				y: end.y,
+				z: end.z,
+				duration: duration,
+				ease: 'linear',
+				onUpdate: () => {
+						// Update posisi kamera
+						camera.position.set(start.x, start.y, start.z);
+
+						camera.lookAt(target);
+				},
+				onComplete: () => {
+					if (animationRunning) {
+						startMoveWithTarget();
+					} else {
+						orbitAnimation = null; // Hapus referensi jika animasi berhenti
+					}
+				},
+			});
+		}
+
+		startMoveWithTarget();
+	});
+}
+
+function fadeTransition(duration = 1, fadeIn = true) {
+  const overlay = document.getElementById('overlay');
+  overlay.style.transition = `opacity ${duration}s`;
+  overlay.style.opacity = fadeIn ? 1 : 0;
+
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(), duration * 1000);
   });
 }
 
-function dollyCamera(position, target, duration) {
-  gsap.to(camera.position, {
-    x: position.x,
-    y: position.y,
-    z: position.z,
-    duration: duration,
-    ease: 'power1.inOut',
-    onUpdate: () => {
-      camera.lookAt(target);
-    }
-  });
+// Fungsi untuk mengganti animasi dengan fade effect
+async function changeAnimation(newAnimation) {
+  animationRunning = false; // Hentikan orbit saat mengganti animasi
+  await fadeTransition(1, true); // Fade in
+	if (cameraAnimation) cameraAnimation.kill(); // Hentikan animasi GSAP secara langsung
+
+  animationRunning = true; // Izinkan orbit kembali
+  newAnimation(); // Jalankan animasi baru
+
+  await fadeTransition(1, false); // Fade out
 }
+
+// Event listener untuk kontrol manual
+window.addEventListener('mousedown', (event) => {
+  // Periksa apakah elemen yang diklik adalah tombol
+  if (event.target.tagName === 'BUTTON') return;
+
+  animationRunning = false; // Hentikan flag animationRunning
+  if (cameraAnimation) cameraAnimation.kill(); // Hentikan animasi GSAP secara langsung
+});
+
 
 // Add buttons for new camera movements
 const buttonContainer = document.createElement('div');
@@ -138,74 +275,31 @@ buttonContainer.style.top = '10px';
 buttonContainer.style.left = '10px';
 buttonContainer.style.zIndex = '1000';
 
-// Extreme wide shot
-const wideOrbitButton = document.createElement('button');
-wideOrbitButton.textContent = 'Wide Orbit';
-wideOrbitButton.onclick = () => orbitCamera(new THREE.Vector3(0, 1, -20), 20, 60, 30);
-buttonContainer.appendChild(wideOrbitButton);
-
-// Truck movement
-const truckButton = document.createElement('button');
-truckButton.textContent = 'Truck/Crab';
-truckButton.onclick = () => {
-  const positions = [
-    { x: -10, z: -10 },
-    { x: 10, z: -10 },
-    { x: 10, z: 10 },
-    { x: -10, z: 10 },
-    { x: -10, z: -10 }
-  ];
-  positions.reduce((prev, curr, i) => {
-    return prev.then(() => {
-      return new Promise((resolve) => {
-        truckCamera(camera.position, curr, 3);
-        setTimeout(resolve, 3000);
-      });
-    });
-  }, Promise.resolve());
-};
-buttonContainer.appendChild(truckButton);
-
-// Dolly movement
-const dollyButton = document.createElement('button');
-dollyButton.textContent = 'Dolly';
-dollyButton.onclick = () => dollyCamera({ x: 0, y: 15, z: 15 }, new THREE.Vector3(0, 1, -1), 5);
-buttonContainer.appendChild(dollyButton);
-
-document.body.appendChild(buttonContainer);
-
-
-
-
-
-function fadeTransition(duration = 1) {
-  const overlay = document.getElementById('overlay');
-  overlay.style.transition = `opacity ${duration}s`;
-  overlay.style.opacity = 1;
-
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      overlay.style.opacity = 0;
-      resolve();
-    }, duration * 1000);
-  });
-}
-
-// Gabungkan beberapa gerakan kamera
-function combinedCameraMovement() {
-  orbitCamera(new THREE.Vector3(0, 1, -20), 20, 60, 30).then(() => {
-    // fadeTransition(0.1);
-
-    return orbitCamera(new THREE.Vector3(0, 1, -10), 10, 30, 20, -1); // Orbit lebih dekat dengan rotasi berlawanan
-  });
-}
-
-
 // Tambahkan tombol untuk gerakan kombinasi
-const combinedButton = document.createElement('button');
-combinedButton.textContent = 'Combined Movement';
-combinedButton.onclick = combinedCameraMovement;
-buttonContainer.appendChild(combinedButton);
+const Animation1 = document.createElement('button');
+Animation1.textContent = 'Animation 1';
+Animation1.onclick = () => changeAnimation(() => orbitCamera(new THREE.Vector3(0, 1, 0), 20, 60, 30));
+buttonContainer.appendChild(Animation1);
+
+const Animation2 = document.createElement('button');
+Animation2.textContent = 'Animation 2';
+Animation2.onclick = () => changeAnimation(() => orbitCamera(new THREE.Vector3(0, 1, 20), 10, 45, 25, -1));
+buttonContainer.appendChild(Animation2);
+
+const Animation3 = document.createElement('button');
+Animation3.textContent = 'Animation 3';
+Animation3.onclick = () => changeAnimation(() => moveWithTargetCamera(new THREE.Vector3(0, 0, -1), new THREE.Vector3(-15, 1, -25), new THREE.Vector3(20, 1, 30), 10));
+buttonContainer.appendChild(Animation3);
+
+const Animation4 = document.createElement('button');
+Animation4.textContent = 'Animation 4';
+Animation4.onclick = () => changeAnimation(() => moveWithTargetCamera(new THREE.Vector3(0, 0, -1), new THREE.Vector3(20, 5, 30), new THREE.Vector3(20, 35, 30), 10));
+buttonContainer.appendChild(Animation4);
+
+const Animation5 = document.createElement('button');
+Animation5.textContent = 'Animation 5';
+Animation5.onclick = () => changeAnimation(() => moveWithTargetCamera(new THREE.Vector3(-30, 20, 25), new THREE.Vector3(-55, 32, 55), new THREE.Vector3(40, 20, 20), 10));
+buttonContainer.appendChild(Animation5);
 
 // Tambahkan overlay untuk efek fade
 const overlay = document.createElement('div');
@@ -219,4 +313,16 @@ overlay.style.backgroundColor = 'black';
 overlay.style.opacity = '0';
 overlay.style.pointerEvents = 'none';
 overlay.style.transition = 'opacity 1s';
+
+document.body.appendChild(buttonContainer);
 document.body.appendChild(overlay);
+
+// Animation loop
+function animate() {
+	requestAnimationFrame(animate);
+	controls.update();
+	renderer.render(scene, camera);
+	console.log(camera.position);
+}
+
+animate();
