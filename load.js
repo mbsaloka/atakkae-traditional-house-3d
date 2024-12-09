@@ -151,7 +151,7 @@ controls.maxDistance = 100;
 controls.minPolarAngle = 0.5;
 controls.maxPolarAngle = 1.5;
 controls.autoRotate = false;
-controls.target = new THREE.Vector3(-20, 1, 30);
+controls.target = new THREE.Vector3(-20, 5, 25);
 controls.update();
 
 const groundGeometry = new THREE.PlaneGeometry(250, 250, 32, 32);
@@ -253,6 +253,7 @@ window.addEventListener("resize", () => {
 // Predefined camera movements
 let animationRunning = true;
 let cameraAnimation;
+let mouseClick = false;
 
 function orbitCamera(target, height, radius, duration = 15, direction = 1) {
 	return new Promise((resolve) => {
@@ -276,7 +277,7 @@ function orbitCamera(target, height, radius, duration = 15, direction = 1) {
 						angle.theta = 0;
 						startOrbit();
 					} else {
-						orbitAnimation = null;
+						cameraAnimation = null;
 					}
 				},
 			});
@@ -286,9 +287,9 @@ function orbitCamera(target, height, radius, duration = 15, direction = 1) {
 	});
 }
 
-function moveWithTargetCamera(target, start, end, duration = 15) {
+function moveFromToCamera(start, end, duration = 15, ease = "power4.out") {
 	return new Promise((resolve) => {
-		function startMoveWithTarget() {
+		function startSlide() {
 			if (!animationRunning) return resolve();
 
 			cameraAnimation = gsap.to(start, {
@@ -296,22 +297,19 @@ function moveWithTargetCamera(target, start, end, duration = 15) {
 				y: end.y,
 				z: end.z,
 				duration: duration,
-				ease: "linear",
+				ease: ease,
 				onUpdate: () => {
 					camera.position.set(start.x, start.y, start.z);
-					camera.lookAt(target);
 				},
 				onComplete: () => {
-					if (animationRunning) {
-						startMoveWithTarget();
-					} else {
-						orbitAnimation = null;
-					}
+					animationRunning = false;
+					cameraAnimation = null;
+					resolve();
 				},
 			});
 		}
 
-		startMoveWithTarget();
+		startSlide();
 	});
 }
 
@@ -326,6 +324,7 @@ function fadeTransition(duration = 1, fadeIn = true) {
 }
 
 async function changeAnimation(newAnimation) {
+	mouseClick = false;
 	animationRunning = false;
 	await fadeTransition(1, true);
 	if (cameraAnimation) cameraAnimation.kill();
@@ -341,10 +340,20 @@ window.addEventListener("mousedown", (event) => {
 	if (event.target.tagName === "SELECT") return;
 
 	animationRunning = false;
+	mouseClick = true;
 	if (cameraAnimation) cameraAnimation.kill();
 });
 
-// Add buttons for new camera movements
+window.addEventListener("wheel", (event) => {
+	if (event.target.tagName === "BUTTON") return;
+	if (event.target.tagName === "SELECT") return;
+
+	animationRunning = false;
+	mouseClick = true;
+	if (cameraAnimation) cameraAnimation.kill();
+});
+
+// Buttons for camera movements
 const buttonContainer = document.createElement("div");
 buttonContainer.style.position = "fixed";
 buttonContainer.style.top = "10px";
@@ -354,14 +363,26 @@ buttonContainer.style.zIndex = "1000";
 const Animation1 = document.createElement("button");
 Animation1.textContent = "Animation 1";
 Animation1.onclick = () =>
-	changeAnimation(() => orbitCamera(new THREE.Vector3(0, 1, 0), 20, 60, 30));
+	changeAnimation(() => orbitCamera(
+		new THREE.Vector3(0, 1, 0),
+		20,
+		60,
+		30
+	)
+);
 buttonContainer.appendChild(Animation1);
 
 const Animation2 = document.createElement("button");
 Animation2.textContent = "Animation 2";
 Animation2.onclick = () =>
 	changeAnimation(() =>
-		orbitCamera(new THREE.Vector3(0, 1, 20), 10, 45, 25, -1)
+		orbitCamera(
+			new THREE.Vector3(0, 1, 20),
+			10,
+			45,
+			25,
+			-1
+		)
 	);
 buttonContainer.appendChild(Animation2);
 
@@ -369,11 +390,10 @@ const Animation3 = document.createElement("button");
 Animation3.textContent = "Animation 3";
 Animation3.onclick = () =>
 	changeAnimation(() =>
-		moveWithTargetCamera(
-			new THREE.Vector3(0, 0, -1),
+		moveFromToCamera(
 			new THREE.Vector3(-15, 1, -25),
 			new THREE.Vector3(20, 1, 30),
-			10
+			20
 		)
 	);
 buttonContainer.appendChild(Animation3);
@@ -382,11 +402,11 @@ const Animation4 = document.createElement("button");
 Animation4.textContent = "Animation 4";
 Animation4.onclick = () =>
 	changeAnimation(() =>
-		moveWithTargetCamera(
-			new THREE.Vector3(0, 0, -1),
-			new THREE.Vector3(20, 5, 30),
-			new THREE.Vector3(20, 35, 30),
-			10
+		moveFromToCamera(
+			new THREE.Vector3(20, 8, 25),
+			new THREE.Vector3(20, 40, 25),
+			15,
+			"power2.out"
 		)
 	);
 buttonContainer.appendChild(Animation4);
@@ -395,14 +415,72 @@ const Animation5 = document.createElement("button");
 Animation5.textContent = "Animation 5";
 Animation5.onclick = () =>
 	changeAnimation(() =>
-		moveWithTargetCamera(
-			new THREE.Vector3(-30, 20, 25),
+		moveFromToCamera(
 			new THREE.Vector3(-55, 32, 55),
 			new THREE.Vector3(40, 20, 20),
-			10
+			20
 		)
 	);
 buttonContainer.appendChild(Animation5);
+
+const Animation6 = document.createElement("button");
+Animation6.textContent = "Animation 6";
+Animation6.onclick = () =>
+	changeAnimation(() =>
+		moveFromToCamera(
+			new THREE.Vector3(0, 4, 27),
+			new THREE.Vector3(30, 8, 27),
+			20
+		)
+	);
+buttonContainer.appendChild(Animation6);
+
+const Animation7 = document.createElement("button");
+Animation7.textContent = "Animation 7";
+Animation7.onclick = () => {
+	changeAnimation(() =>
+		moveFromToCamera(
+			new THREE.Vector3(13, 6, 50),
+			new THREE.Vector3(13, 6, 0),
+			10,
+			"power1.out"
+		)
+	);
+
+	setTimeout(() => {
+		if (mouseClick) return;
+		animationRunning = true;
+		moveFromToCamera(
+			new THREE.Vector3(13, 6, 0),
+			new THREE.Vector3(-50, 6, 0),
+			15,
+			"power1.inOut"
+		)
+	}, 10000);
+
+	setTimeout(() => {
+		if (mouseClick) return;
+		animationRunning = true;
+		moveFromToCamera(
+			new THREE.Vector3(-50, 6, 0),
+			new THREE.Vector3(-50, 6, 50),
+			10,
+			"power1.inOut"
+		)
+	}, 25000);
+
+	setTimeout(() => {
+		if (mouseClick) return;
+		animationRunning = true;
+		moveFromToCamera(
+			new THREE.Vector3(-50, 6, 50),
+			new THREE.Vector3(13, 6, 50),
+			15,
+			"power1.inOut"
+		)
+	}, 35000);
+}
+buttonContainer.appendChild(Animation7);
 
 const overlay = document.createElement("div");
 overlay.id = "overlay";
@@ -424,6 +502,7 @@ function animate() {
 	requestAnimationFrame(animate);
 	controls.update();
 	renderer.render(scene, camera);
+	// console.log(camera.position);
 }
 
 animate();
