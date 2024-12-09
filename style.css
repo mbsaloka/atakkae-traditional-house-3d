@@ -94,7 +94,7 @@ h1 {
 }
 
 input:checked + .slider {
-  background-color: #2196F3;
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 input:checked + .slider:before {
@@ -144,4 +144,13 @@ button:hover {
 button:active {
   background: rgba(255, 255, 255, 0.9);
   color: rgb(30, 30, 30);
+}
+
+#model-toggle {
+  position: fixed;
+  top: 80px; /* Positioned below the ambience toggle */
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }

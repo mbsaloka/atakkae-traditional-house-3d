@@ -6,7 +6,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio * 0.5);
+renderer.setPixelRatio(window.devicePixelRatio * 1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -216,7 +216,7 @@ document.getElementById("ambience-select").addEventListener("change", (e) => {
 // Model loading
 const loader = new GLTFLoader().setPath("models/");
 loader.load(
-	"bugis-v3.glb",
+	"bugis-v5.glb",
 	(gltf) => {
 		const mesh = gltf.scene;
 
@@ -242,6 +242,39 @@ loader.load(
 			}/100`;
 	}
 );
+
+let treeModel;
+const treeToggle = document.getElementById('tree-toggle');
+
+loader.load(
+    'pohon1.glb',
+    (gltf) => {
+        treeModel = gltf.scene;
+
+        treeModel.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                if (child.material instanceof THREE.MeshStandardMaterial) {
+                    child.material.roughness = 0.7;
+                    child.material.metalness = 0.2;
+                }
+            }
+        });
+
+        // Position the tree model as needed
+        treeModel.position.set(-15, 0, 25); // Adjust these values as needed
+        scene.add(treeModel);
+    }
+);
+
+// Add the toggle event listener
+treeToggle.addEventListener('change', (e) => {
+    if (treeModel) {
+        treeModel.visible = e.target.checked;
+    }
+});
 
 // Window resize handler
 window.addEventListener("resize", () => {
@@ -338,6 +371,7 @@ async function changeAnimation(newAnimation) {
 window.addEventListener("mousedown", (event) => {
 	if (event.target.tagName === "BUTTON") return;
 	if (event.target.tagName === "SELECT") return;
+	if (event.target.tagName === "SPAN") return;
 
 	animationRunning = false;
 	mouseClick = true;
@@ -417,7 +451,7 @@ Animation5.onclick = () =>
 	changeAnimation(() =>
 		moveFromToCamera(
 			new THREE.Vector3(-55, 32, 55),
-			new THREE.Vector3(40, 20, 20),
+			new THREE.Vector3(40, 20, 25),
 			20
 		)
 	);
@@ -437,49 +471,45 @@ buttonContainer.appendChild(Animation6);
 
 const Animation7 = document.createElement("button");
 Animation7.textContent = "Animation 7";
-Animation7.onclick = () => {
-	changeAnimation(() =>
-		moveFromToCamera(
-			new THREE.Vector3(13, 6, 50),
-			new THREE.Vector3(13, 6, 0),
-			10,
-			"power1.out"
-		)
+Animation7.onclick = async () => {
+	await fadeTransition(1, true);
+	if (cameraAnimation) cameraAnimation.kill();
+	setTimeout(() => {
+		fadeTransition(1, false);
+	}, 100);
+
+	animationRunning = true;
+	await moveFromToCamera(
+		new THREE.Vector3(13, 6, 50),
+		new THREE.Vector3(13, 6, 0),
+		10,
+		"power1.out"
 	);
 
-	setTimeout(() => {
-		if (mouseClick) return;
-		animationRunning = true;
-		moveFromToCamera(
-			new THREE.Vector3(13, 6, 0),
-			new THREE.Vector3(-50, 6, 0),
-			15,
-			"power1.inOut"
-		)
-	}, 10000);
+  animationRunning = true;
+  await moveFromToCamera(
+    new THREE.Vector3(13, 6, 0),
+    new THREE.Vector3(-50, 6, 0),
+    15,
+    "power1.inOut"
+  );
 
-	setTimeout(() => {
-		if (mouseClick) return;
-		animationRunning = true;
-		moveFromToCamera(
-			new THREE.Vector3(-50, 6, 0),
-			new THREE.Vector3(-50, 6, 50),
-			10,
-			"power1.inOut"
-		)
-	}, 25000);
+  animationRunning = true;
+  await moveFromToCamera(
+    new THREE.Vector3(-50, 6, 0),
+    new THREE.Vector3(-50, 6, 50),
+    10,
+    "power1.inOut"
+  );
 
-	setTimeout(() => {
-		if (mouseClick) return;
-		animationRunning = true;
-		moveFromToCamera(
-			new THREE.Vector3(-50, 6, 50),
-			new THREE.Vector3(13, 6, 50),
-			15,
-			"power1.inOut"
-		)
-	}, 35000);
-}
+  animationRunning = true;
+  await moveFromToCamera(
+    new THREE.Vector3(-50, 6, 50),
+    new THREE.Vector3(13, 6, 50),
+    15,
+    "power1.inOut"
+  );
+};
 buttonContainer.appendChild(Animation7);
 
 const overlay = document.createElement("div");
